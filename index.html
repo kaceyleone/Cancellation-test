@@ -1,0 +1,1148 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Visual Cancellation Task (Shareable)</title>
+  <style>
+    :root{
+      --border:#d8dbe3; --card:#ffffff; --bg:#f6f7fb;
+      --text:#0f172a; --muted:#5b6474; --shadow:0 10px 26px rgba(15,23,42,.08);
+      --btn:#ffffff; --btnb:#cfd5e3;
+    }
+    html,body{height:100%; margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif; background:var(--bg); color:var(--text);}
+    header{
+      position:sticky; top:0; z-index:10;
+      background:rgba(255,255,255,.92);
+      backdrop-filter: blur(8px);
+      border-bottom:1px solid var(--border);
+      padding:10px 12px;
+      display:flex; gap:10px; align-items:center; flex-wrap:wrap;
+    }
+    .btn{
+      padding:9px 12px; border-radius:12px; border:1px solid var(--btnb);
+      background:var(--btn); font-weight:800; cursor:pointer; color:var(--text);
+    }
+    .btn.primary{ background:#eef4ff; border-color:#b9ccff; }
+    .btn:disabled{ opacity:.5; cursor:not-allowed; }
+    .pill{
+      font-size:12px; padding:6px 10px; border-radius:999px;
+      background:#f1f3f7; border:1px solid #e4e7ef; color:#111827; font-weight:800;
+    }
+    main{max-width:1100px; margin:0 auto; padding:12px; display:grid; grid-template-columns: 1.35fr 1fr; gap:12px;}
+    #mainLayout.onecol{ grid-template-columns: 1fr !important; }
+    #mainLayout.twocol{ grid-template-columns: 1.35fr 1fr !important; }
+    @media (max-width: 980px){ main{grid-template-columns:1fr;} }
+    .card{background:var(--card); border:1px solid var(--border); border-radius:18px; padding:14px; box-shadow:var(--shadow);}
+    .banner{padding:12px; border:1px solid #e8ebf2; background:#fbfcff; border-radius:14px;}
+    .muted{color:var(--muted); font-size:13px; line-height:1.4;}
+    h2,h3{margin:6px 0 10px;}
+    canvas{
+      border:1px solid #9aa3b2;
+      border-radius:14px;
+      width:100%;
+      max-width:860px;
+      height:auto;
+      display:block;
+      margin: 12px auto 0;
+      background:#fff;
+    }
+    table{width:100%; border-collapse:collapse; margin-top:8px;}
+    th,td{padding:8px; border-bottom:1px solid #eef0f5; font-size:14px; vertical-align:top;}
+    th{text-align:left; color:#111827; width:58%;}
+    .big{font-size:16px; font-weight:900; margin-top:10px;}
+    .hint{font-size:12px; color:#7a8396;}
+    .row{display:flex; gap:10px; align-items:center; flex-wrap:wrap;}
+    .screen{display:none; text-align:center; padding:18px 10px;}
+    .screen.show{display:block;}
+
+    .modalBack{
+      position:fixed; inset:0; z-index:50;
+      background:rgba(2,6,23,.40);
+      display:none; align-items:center; justify-content:center;
+      padding:14px;
+      overflow:auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    .modalBack.show{display:flex;}
+    .modal{
+      width:min(820px, 100%);
+      background:#fff; border:1px solid var(--border); border-radius:18px;
+      box-shadow:0 14px 44px rgba(2,6,23,.25);
+      padding:16px;
+      max-height:90vh;
+      overflow-y:auto;
+      -webkit-overflow-scrolling: touch;
+      text-align:left;
+    }
+    .grid{display:grid; grid-template-columns: 1fr 1fr; gap:12px;}
+    @media (max-width: 760px){ .grid{grid-template-columns:1fr;} }
+    label{font-size:12px; color:#111827; font-weight:900; display:block; margin-bottom:4px; text-transform:uppercase; letter-spacing:.3px;}
+    input, select{width:100%; font-size:13px; padding:9px 10px; border-radius:12px; border:1px solid #cfd5e3; box-sizing:border-box; background:#fff;}
+    input[type="color"]{width:56px; height:36px; padding:0; border:none; background:none;}
+    .divider{height:1px; background:#eef0f5; margin:12px 0;}
+    .stickyActions{
+      position:sticky; bottom:0;
+      background:#fff; padding-top:10px; margin-top:12px;
+      display:flex; justify-content:flex-end; gap:10px;
+      border-top:1px solid #eef0f5;
+    }
+    .toggleRow{display:flex; gap:10px; align-items:center; padding:10px 12px; border:1px solid #eef0f5; border-radius:14px; background:#fcfdff;}
+    .toggleRow input{width:auto;}
+  </style>
+</head>
+<body>
+<header>
+  <button class="btn" id="settingsBtn" title="Examiner Settings (Ctrl+Shift+S)">Examiner Settings</button>
+  <button class="btn primary" id="startProtocolBtn">Start Protocol</button>
+  <button class="btn primary" id="startNextBtn" disabled>Start Next Trial</button>
+
+  <span class="pill" id="statusPill">Ready</span>
+  <span class="pill" id="trialPill">Trial: —</span>
+  <span class="pill" id="timerPill">00</span>
+
+  <button class="btn" id="pauseBtn" disabled>Pause</button>
+  <button class="btn" id="resumeBtn" disabled>Resume</button>
+</header>
+
+<main id="mainLayout" class="onecol">
+  <div class="card">
+    <div class="banner muted">
+      <b>Instructions:</b> Click all <b>TRIANGLES</b> as quickly and accurately as possible. Avoid clicking other shapes.<br>
+      <span class="hint">Examiner controls trial starts. Shortcut: Ctrl+Shift+S opens settings.</span>
+    </div>
+
+    <div id="screenIntro" class="screen show">
+      <h2>Cancellation Task</h2>
+      <p class="muted" id="introText">Examiner: open settings, enter Participant ID, choose protocol, then start.</p>
+      <div class="row" style="justify-content:center; margin-top:10px;">
+        <button class="btn primary" id="introStartBtn">Start</button>
+      </div>
+    </div>
+
+    <div id="screenBetween" class="screen">
+      <h2 id="betweenTitle">Ready</h2>
+      <p class="muted" id="betweenText">Examiner: start next trial when ready.</p>
+      <div class="row" style="justify-content:center; margin-top:10px;">
+        <button class="btn primary" id="betweenStartBtn">Start Next Trial</button>
+      </div>
+    </div>
+
+    <div id="screenDone" class="screen">
+      <h2>Protocol complete</h2>
+      <p class="muted">Results are shown on the right. (Auto-submitted to Google Form.)</p>
+      <div class="row" style="justify-content:center; margin-top:10px;">
+        <button class="btn" id="restartBtn">Restart</button>
+      </div>
+    </div>
+
+    <canvas id="cv" width="860" height="860"></canvas>
+  </div>
+
+  <div class="card" id="resultsCard" style="display:none;">
+    <h3>Results</h3>
+    <div id="results" class="muted">Results appear after the final trial.</div>
+    <div class="row" style="margin-top:12px;">
+      <button class="btn" id="csvBtn" disabled>Download CSV</button>
+      <button class="btn" id="copyBtn" disabled>Copy Summary</button>
+    </div>
+    <div class="hint" style="margin-top:10px;">
+      Auto-submit status: <span id="autosaveStatus">On (fixed form)</span>
+    </div>
+  </div>
+</main>
+
+<!-- Settings Modal -->
+<div class="modalBack" id="modalBack">
+  <div class="modal">
+    <h3 style="margin:6px 0 8px;">Examiner Settings</h3>
+    <p class="muted" style="margin-top:0;">Settings lock once the protocol begins. Restart to change.</p>
+
+    <div class="grid">
+      <div>
+        <label>Participant ID (required)</label>
+        <input id="setPid" type="text" maxlength="64" placeholder="e.g., P001 (non-identifying)">
+        <div class="hint">Use codes only (no names/DOB).</div>
+      </div>
+
+      <div>
+        <label>Protocol</label>
+        <select id="setProtocol">
+          <option value="WHITE_ONLY">1 trial: White only</option>
+          <option value="WHITE_TINT" selected>2 trials: White + Blue (random order)</option>
+          <option value="WHITE_MID_TINT">3 trials: White + Mid + Blue (random order)</option>
+        </select>
+      </div>
+
+      <div class="toggleRow" style="grid-column:1/-1;">
+        <input type="checkbox" id="setKeepMidMiddle" checked>
+        <div>
+          <div style="font-weight:900;">Keep MID in the middle (3-trial)</div>
+          <div class="hint">Randomizes only whether White or Blue comes first.</div>
+        </div>
+      </div>
+
+      <div>
+        <label>Trial duration (seconds)</label>
+        <input id="setDuration" type="number" min="10" max="300" value="60">
+      </div>
+
+      <div>
+        <label>Number of items (default 350)</label>
+        <input id="setNItems" type="number" min="40" max="520" value="350">
+      </div>
+
+      <div>
+        <label>Target proportion (%)</label>
+        <input id="setTargetPct" type="number" min="5" max="45" value="20">
+      </div>
+
+      <div>
+        <label>Layout</label>
+        <select id="setLayout">
+          <option value="SCATTER" selected>Scattered / uneven</option>
+          <option value="GRID">Grid (even spacing)</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Minimum spacing (scatter)</label>
+        <input id="setMinDist" type="number" min="10" max="70" value="22">
+      </div>
+
+      <div>
+        <label>Blue background</label>
+        <div class="row">
+          <input id="setTint" type="color" value="#cfe8ff">
+          <span class="hint">Tinted condition</span>
+        </div>
+      </div>
+
+      <div>
+        <label>Mid background</label>
+        <div class="row">
+          <input id="setMid" type="color" value="#e8f0ff">
+          <span class="hint">Intermediate</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stickyActions">
+      <button class="btn" id="closeSettingsBtn">Close</button>
+      <button class="btn primary" id="saveSettingsBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // ===============================
+  // Google Form (fixed, autosubmit)
+  // ===============================
+  const FORM_RESPONSE_URL =
+    "https://docs.google.com/forms/d/e/1FAIpQLScIPKzSMwVwZXN3xLer2WEYpDXh_NNVz9rR5-d0OcffdMJd8A/formResponse";
+
+  // Entry IDs (21) you provided (one row per participant)
+  const ENTRY = {
+    participantId: "entry.644200680",
+    sessionId: "entry.117953226",
+    protocol: "entry.491528102",
+    order: "entry.271299425",
+    durationSec: "entry.836378996",
+
+    white_hits: "entry.517770744",
+    white_omissions: "entry.1483177179",
+    white_falseAlarms: "entry.97989345",
+    white_meanRTms: "entry.1816529791",
+    white_totalTimeSec: "entry.1614849134",
+
+    blue_hits: "entry.234078243",
+    blue_omissions: "entry.665470837",
+    blue_falseAlarms: "entry.89001755",
+    blue_meanRTms: "entry.1038228631",
+    blue_totalTimeSec: "entry.1962117722",
+
+    medium_hits: "entry.1167516561",
+    medium_omissions: "entry.275099489",
+    medium_falseAlarms: "entry.1664261428",
+    medium_meanRTms: "entry.2038088285",
+    medium_totalTimeSec: "entry.141740432",
+
+    deltaBlueMinusWhiteMeanRTms: "entry.1051441543"
+  };
+
+  function postToGoogleForm(summaryRow) {
+    const params = new URLSearchParams();
+    for (const [key, entryId] of Object.entries(ENTRY)) {
+      params.set(entryId, String(summaryRow[key] ?? ""));
+    }
+    fetch(FORM_RESPONSE_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params
+    }).catch(() => {});
+  }
+
+  // ===== DOM =====
+  const cv = document.getElementById("cv");
+  const ctx = cv.getContext("2d");
+
+  const settingsBtn = document.getElementById("settingsBtn");
+  const startProtocolBtn = document.getElementById("startProtocolBtn");
+  const startNextBtn = document.getElementById("startNextBtn");
+  const pauseBtn = document.getElementById("pauseBtn");
+  const resumeBtn = document.getElementById("resumeBtn");
+
+  const introStartBtn = document.getElementById("introStartBtn");
+  const betweenStartBtn = document.getElementById("betweenStartBtn");
+  const restartBtn = document.getElementById("restartBtn");
+
+  const statusPill = document.getElementById("statusPill");
+  const trialPill = document.getElementById("trialPill");
+  const timerPill = document.getElementById("timerPill");
+
+  const screenIntro = document.getElementById("screenIntro");
+  const screenBetween = document.getElementById("screenBetween");
+  const screenDone = document.getElementById("screenDone");
+  const betweenTitle = document.getElementById("betweenTitle");
+  const betweenText = document.getElementById("betweenText");
+  const introText = document.getElementById("introText");
+
+  const resultsEl = document.getElementById("results");
+  const resultsCard = document.getElementById("resultsCard");
+
+  const csvBtn = document.getElementById("csvBtn");
+  const copyBtn = document.getElementById("copyBtn");
+  const autosaveStatus = document.getElementById("autosaveStatus");
+
+  const modalBack = document.getElementById("modalBack");
+  const closeSettingsBtn = document.getElementById("closeSettingsBtn");
+  const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+
+  const setPid = document.getElementById("setPid");
+  const setProtocol = document.getElementById("setProtocol");
+  const setKeepMidMiddle = document.getElementById("setKeepMidMiddle");
+  const setDuration = document.getElementById("setDuration");
+  const setNItems = document.getElementById("setNItems");
+  const setTargetPct = document.getElementById("setTargetPct");
+  const setLayout = document.getElementById("setLayout");
+  const setMinDist = document.getElementById("setMinDist");
+  const setTint = document.getElementById("setTint");
+  const setMid = document.getElementById("setMid");
+
+  const mainLayout = document.getElementById("mainLayout");
+
+  // ===== Helpers =====
+  const mean = arr => arr.length ? arr.reduce((a,b)=>a+b,0)/arr.length : null;
+  const fmt = (x,d=0) => (x==null || Number.isNaN(x)) ? "—" : Number(x).toFixed(d);
+  const clampInt = (v,min,max,fallback) => (Number.isNaN(v)||v==null) ? fallback : Math.max(min, Math.min(max, v));
+  function shuffle(arr){
+    const a=[...arr];
+    for(let i=a.length-1;i>0;i--){
+      const j=Math.floor(Math.random()*(i+1));
+      [a[i],a[j]]=[a[j],a[i]];
+    }
+    return a;
+  }
+  function setStatus(t){ statusPill.textContent=t; }
+  function setTrialLabel(t){ trialPill.textContent=t; }
+  function setTimer(sec){ timerPill.textContent=String(Math.max(0,sec)).padStart(2,"0"); }
+  function showScreen(which){
+    screenIntro.classList.remove("show");
+    screenBetween.classList.remove("show");
+    screenDone.classList.remove("show");
+    which.classList.add("show");
+  }
+  function safeCSV(v){
+    const s=(v ?? "").toString();
+    if(s.includes(",") || s.includes('"') || s.includes("\n")) return `"${s.replaceAll('"','""')}"`;
+    return s;
+  }
+  function uuid(){
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+      const r = (Math.random()*16)|0;
+      const v = c === "x" ? r : (r&0x3)|0x8;
+      return v.toString(16);
+    });
+  }
+
+  // ===== Settings =====
+  let SETTINGS = {
+    pid: "",
+    protocol: "WHITE_TINT",
+    keep_mid_middle: true,
+    duration_s: 60,
+    n_items: 350,            // ✅ default 350
+    target_rate: 0.20,
+    layout: "SCATTER",
+    min_dist: 22,
+    tint: "#cfe8ff",
+    mid: "#e8f0ff",
+  };
+
+  let settingsLocked=false;
+
+  function protocolLabel(){
+    if(SETTINGS.protocol==="WHITE_ONLY") return "White only";
+    if(SETTINGS.protocol==="WHITE_MID_TINT") return "3 trials (random order)";
+    return "2 trials (random order)";
+  }
+  function condLabel(cond){
+    if(cond==="WHITE") return "White";
+    if(cond==="MID") return "Mid";
+    return "Blue";
+  }
+  function bgColor(cond){
+    if(cond==="WHITE") return "#ffffff";
+    if(cond==="MID") return SETTINGS.mid;
+    return SETTINGS.tint;
+  }
+
+  function planFromProtocol(){
+    if(SETTINGS.protocol === "WHITE_ONLY") return ["WHITE"];
+
+    if(SETTINGS.protocol === "WHITE_TINT"){
+      return shuffle(["WHITE","TINT"]);
+    }
+
+    if(SETTINGS.protocol === "WHITE_MID_TINT"){
+      if(SETTINGS.keep_mid_middle){
+        return (Math.random()<0.5) ? ["WHITE","MID","TINT"] : ["TINT","MID","WHITE"];
+      }
+      return shuffle(["WHITE","MID","TINT"]);
+    }
+
+    return shuffle(["WHITE","TINT"]);
+  }
+
+  function loadSettingsIntoModal(){
+    setPid.value = SETTINGS.pid || "";
+    setProtocol.value = SETTINGS.protocol;
+    setKeepMidMiddle.checked = !!SETTINGS.keep_mid_middle;
+    setDuration.value = SETTINGS.duration_s;
+    setNItems.value = SETTINGS.n_items;
+    setTargetPct.value = Math.round(SETTINGS.target_rate*100);
+    setLayout.value = SETTINGS.layout;
+    setMinDist.value = SETTINGS.min_dist;
+    setTint.value = SETTINGS.tint;
+    setMid.value = SETTINGS.mid;
+  }
+
+  function applyModalToSettings(){
+    SETTINGS.pid = (setPid.value || "").trim();
+    SETTINGS.protocol = setProtocol.value;
+    SETTINGS.keep_mid_middle = !!setKeepMidMiddle.checked;
+    SETTINGS.duration_s = clampInt(parseInt(setDuration.value,10), 10, 300, 60);
+    SETTINGS.n_items = clampInt(parseInt(setNItems.value,10), 40, 520, 350);  // ✅ default 350
+    SETTINGS.target_rate = clampInt(parseInt(setTargetPct.value,10), 5, 45, 20)/100;
+    SETTINGS.layout = (setLayout.value==="GRID") ? "GRID" : "SCATTER";
+    SETTINGS.min_dist = clampInt(parseInt(setMinDist.value,10), 10, 70, 22);
+    SETTINGS.tint = setTint.value;
+    SETTINGS.mid = setMid.value;
+
+    updateIntroText();
+  }
+
+  function openSettings(){
+    if(settingsLocked){
+      alert("Settings are locked after the protocol begins. Restart to change settings.");
+      return;
+    }
+    loadSettingsIntoModal();
+    modalBack.classList.add("show");
+  }
+  function closeSettings(){ modalBack.classList.remove("show"); }
+
+  // ===== Stimuli =====
+  const PAD = 54;
+  const SHAPES = ["triangle","circle","square","diamond","plus","star"];
+
+  let items = []; // {x,y,size,shape,isTarget,clicked}
+
+  function rand(min,max){ return min + Math.random()*(max-min); }
+  function pickDistractor(){
+    const opts = SHAPES.filter(s=>s!=="triangle");
+    return opts[Math.floor(Math.random()*opts.length)];
+  }
+
+  function drawShape(shape, s){
+    ctx.beginPath();
+    if(shape==="triangle"){
+      ctx.moveTo(0,-s/2); ctx.lineTo(s/2,s/2); ctx.lineTo(-s/2,s/2); ctx.closePath();
+    } else if(shape==="circle"){
+      ctx.arc(0,0,s/2,0,Math.PI*2); ctx.closePath();
+    } else if(shape==="square"){
+      ctx.rect(-s/2,-s/2,s,s); ctx.closePath();
+    } else if(shape==="diamond"){
+      ctx.moveTo(0,-s/2); ctx.lineTo(s/2,0); ctx.lineTo(0,s/2); ctx.lineTo(-s/2,0); ctx.closePath();
+    } else if(shape==="plus"){
+      const t=s*0.22, h=s*0.5;
+      ctx.moveTo(-t/2,-h); ctx.lineTo(t/2,-h); ctx.lineTo(t/2,-t/2);
+      ctx.lineTo(h,-t/2); ctx.lineTo(h,t/2); ctx.lineTo(t/2,t/2);
+      ctx.lineTo(t/2,h); ctx.lineTo(-t/2,h); ctx.lineTo(-t/2,t/2);
+      ctx.lineTo(-h,t/2); ctx.lineTo(-h,-t/2); ctx.lineTo(-t/2,-t/2);
+      ctx.closePath();
+    } else if(shape==="star"){
+      const spikes=5, outer=s/2, inner=outer*0.45;
+      let rot=Math.PI/2*3;
+      ctx.moveTo(0,-outer);
+      for(let i=0;i<spikes;i++){
+        ctx.lineTo(Math.cos(rot)*outer, Math.sin(rot)*outer); rot+=Math.PI/spikes;
+        ctx.lineTo(Math.cos(rot)*inner, Math.sin(rot)*inner); rot+=Math.PI/spikes;
+      }
+      ctx.lineTo(0,-outer); ctx.closePath();
+    }
+  }
+
+  function generateGrid(nItems, targetRate){
+    items=[];
+    const n=Math.ceil(Math.sqrt(nItems));
+    const usable=cv.width - PAD*2;
+    const step=usable/n;
+    const size=Math.max(14, Math.min(30, step*0.55));
+    const wanted=Math.min(nItems, n*n);
+
+    for(let i=0;i<wanted;i++){
+      const r=Math.floor(i/n), c=i%n;
+      const x=PAD + c*step + step/2;
+      const y=PAD + r*step + step/2;
+      const isTarget=Math.random()<targetRate;
+      items.push({x,y,size,shape:isTarget?"triangle":pickDistractor(),isTarget,clicked:false});
+    }
+  }
+
+  function generateScatter(nItems, targetRate, minDist){
+    items=[];
+    const size=20;
+    const maxAttempts=nItems*90;
+
+    function ok(x,y){
+      for(const it of items){
+        const dx=x-it.x, dy=y-it.y;
+        if(dx*dx+dy*dy < minDist*minDist) return false;
+      }
+      return true;
+    }
+
+    let attempts=0;
+    while(items.length<nItems && attempts<maxAttempts){
+      attempts++;
+      const x=rand(PAD, cv.width-PAD);
+      const y=rand(PAD, cv.height-PAD);
+      if(!ok(x,y)) continue;
+      const isTarget=Math.random()<targetRate;
+      items.push({x,y,size,shape:isTarget?"triangle":pickDistractor(),isTarget,clicked:false});
+    }
+    while(items.length<nItems){
+      const x=rand(PAD, cv.width-PAD);
+      const y=rand(PAD, cv.height-PAD);
+      const isTarget=Math.random()<targetRate;
+      items.push({x,y,size,shape:isTarget?"triangle":pickDistractor(),isTarget,clicked:false});
+    }
+  }
+
+  function buildStimuli(){
+    if(SETTINGS.layout==="GRID") generateGrid(SETTINGS.n_items, SETTINGS.target_rate);
+    else generateScatter(SETTINGS.n_items, SETTINGS.target_rate, SETTINGS.min_dist);
+  }
+
+  function render(cond){
+    ctx.fillStyle=bgColor(cond);
+    ctx.fillRect(0,0,cv.width,cv.height);
+
+    ctx.fillStyle="#111827";
+    ctx.font="20px system-ui";
+    ctx.fillText("Click all TRIANGLES (avoid other shapes)", 20, 34);
+
+    for(const it of items){
+      ctx.save();
+      ctx.translate(it.x,it.y);
+      ctx.lineWidth=2;
+      ctx.strokeStyle="#111827";
+      drawShape(it.shape, it.size);
+
+      if(it.clicked){
+        ctx.fillStyle = it.isTarget ? "rgba(17,24,39,0.18)" : "rgba(17,24,39,0.08)";
+        ctx.fill();
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  function hitTest(mx,my){
+    for(const it of items){
+      const dx=mx-it.x, dy=my-it.y;
+      const rad=it.size*0.72;
+      if(dx*dx+dy*dy <= rad*rad) return it;
+    }
+    return null;
+  }
+
+  // ===== Protocol State =====
+  let PLAN = ["WHITE","TINT"];
+  let trialIndex = -1;
+  let running=false;
+  let paused=false;
+  let startPerf=0;
+  let endAtPerf=0;
+  let tick=null;
+  let pausedAccum=0;
+  let pauseStart=0;
+
+  const session = {
+    session_id: null,
+    started_iso: null,
+    plan: [],
+    trials: [] // {cond, n_items, n_targets, events[], summary{}}
+  };
+
+  function drawBlank(){
+    ctx.fillStyle="#ffffff";
+    ctx.fillRect(0,0,cv.width,cv.height);
+    ctx.fillStyle="#111827";
+    ctx.font="22px system-ui";
+    ctx.textAlign="center";
+    ctx.textBaseline="middle";
+    ctx.fillText("Awaiting examiner…", cv.width/2, cv.height/2);
+    ctx.textAlign="left";
+    ctx.textBaseline="alphabetic";
+  }
+
+  function updateIntroText(){
+    PLAN = planFromProtocol();
+    introText.textContent =
+      `Protocol: ${protocolLabel()} • Trials: ${PLAN.length} • PID: ${SETTINGS.pid || "—"} • Order preview: ${PLAN.map(condLabel).join(" → ")}`;
+  }
+
+  function resetAll(){
+    running=false; paused=false;
+    clearInterval(tick); tick=null;
+    settingsLocked=false;
+
+    PLAN = planFromProtocol();
+    trialIndex=-1;
+
+    session.session_id = null;
+    session.started_iso=null;
+    session.plan=[];
+    session.trials=[];
+
+    setStatus("Ready");
+    setTrialLabel("Trial: —");
+    setTimer(0);
+
+    resultsCard.style.display = "none";
+    mainLayout.classList.remove("twocol");
+    mainLayout.classList.add("onecol");
+
+    startProtocolBtn.disabled=false;
+    startNextBtn.disabled=true;
+    pauseBtn.disabled=true;
+    resumeBtn.disabled=true;
+
+    csvBtn.disabled=true;
+    copyBtn.disabled=true;
+
+    resultsEl.textContent="Results appear after the final trial.";
+    showScreen(screenIntro);
+    drawBlank();
+    updateIntroText();
+  }
+
+  function beginProtocol(){
+    if(!SETTINGS.pid){
+      alert("Enter a Participant ID in Examiner Settings before starting.");
+      openSettings();
+      return;
+    }
+
+    PLAN = planFromProtocol();
+    session.session_id = uuid();
+    session.started_iso = new Date().toISOString();
+    session.plan = [...PLAN];
+    session.trials = [];
+    trialIndex = -1;
+
+    settingsLocked=true;
+
+    resultsEl.textContent="Running… results will appear after the final trial.";
+    csvBtn.disabled=true;
+    copyBtn.disabled=true;
+
+    startProtocolBtn.disabled=true;
+    startNextBtn.disabled=false;
+    pauseBtn.disabled=true;
+    resumeBtn.disabled=true;
+
+    betweenTitle.textContent = "Ready to start Trial 1";
+    betweenText.textContent = `Next condition: ${condLabel(PLAN[0])}. Examiner: start when ready.`;
+    showScreen(screenBetween);
+
+    setStatus("Ready to start");
+    setTrialLabel("Trial: —");
+    setTimer(0);
+  }
+
+  function beginTrial(nextIndex){
+    if(running) return;
+    if(nextIndex !== trialIndex+1) return;
+    if(nextIndex < 0 || nextIndex >= PLAN.length) return;
+
+    trialIndex = nextIndex;
+    const cond = PLAN[trialIndex];
+
+    buildStimuli();
+    render(cond);
+
+    const nTargets = items.filter(i=>i.isTarget).length;
+    session.trials.push({
+      cond,
+      n_items: items.length,
+      n_targets: nTargets,
+      events: [],   // store only click timestamps + target flag
+      summary: null
+    });
+
+    running=true;
+    paused=false;
+    pausedAccum=0;
+
+    startPerf=performance.now();
+    endAtPerf=startPerf + SETTINGS.duration_s*1000;
+
+    setStatus("Running…");
+    setTrialLabel(`Trial ${trialIndex+1}/${PLAN.length} (${condLabel(cond)})`);
+    setTimer(SETTINGS.duration_s);
+
+    startNextBtn.disabled=true;
+    pauseBtn.disabled=false;
+    resumeBtn.disabled=true;
+
+    screenIntro.classList.remove("show");
+    screenBetween.classList.remove("show");
+    screenDone.classList.remove("show");
+
+    clearInterval(tick);
+    tick=setInterval(()=>{
+      if(!running || paused) return;
+      const remaining = Math.ceil((endAtPerf - performance.now() + pausedAccum)/1000);
+      setTimer(remaining);
+      if(performance.now() >= (endAtPerf + pausedAccum)) endTrial();
+    }, 100);
+  }
+
+  function endTrial(){
+    if(!running) return;
+    running=false; paused=false;
+    clearInterval(tick); tick=null;
+    pauseBtn.disabled=true;
+    resumeBtn.disabled=true;
+    setTimer(0);
+
+    const t = session.trials[trialIndex];
+
+    const hits = items.filter(x=>x.isTarget && x.clicked).length;
+    const falseAlarms = items.filter(x=>!x.isTarget && x.clicked).length;
+    const omissions = Math.max(0, t.n_targets - hits);
+
+    // Mean RT for correct hits: use target click timestamps (first-time clicks only)
+    const hitRTs = t.events.filter(e=>e.is_target).map(e=>e.t_rel_ms);
+    const meanRTms = hitRTs.length ? Math.round(mean(hitRTs)) : "";
+
+    t.summary = {
+      hits,
+      omissions,
+      false_alarms: falseAlarms,
+      mean_rt_ms: meanRTms,
+      total_time_s: SETTINGS.duration_s
+    };
+
+    if(trialIndex < PLAN.length-1){
+      setStatus("Trial complete");
+      setTrialLabel("Trial: paused");
+      const nextCond = PLAN[trialIndex+1];
+      betweenTitle.textContent = `Trial ${trialIndex+1} complete`;
+      betweenText.textContent = `Next condition: ${condLabel(nextCond)}. Examiner: start when ready.`;
+      showScreen(screenBetween);
+      startNextBtn.disabled=false;
+    } else {
+      finishProtocol();
+    }
+  }
+
+  function finishProtocol(){
+    setStatus("Done ✅");
+    setTrialLabel("Trial: —");
+    showScreen(screenDone);
+    startProtocolBtn.disabled=false;
+    startNextBtn.disabled=true;
+
+    resultsCard.style.display = "block";
+    mainLayout.classList.remove("onecol");
+    mainLayout.classList.add("twocol");
+
+    const summary = computeParticipantSummary();
+    renderResults(summary);
+
+    // ✅ ONE row per participant
+    postToGoogleForm(summary);
+
+    csvBtn.disabled=false;
+    copyBtn.disabled=false;
+  }
+
+  function pause(){
+    if(!running || paused) return;
+    paused=true;
+    pauseStart=performance.now();
+    setStatus("Paused");
+    pauseBtn.disabled=true;
+    resumeBtn.disabled=false;
+  }
+  function resume(){
+    if(!running || !paused) return;
+    paused=false;
+    pausedAccum += (performance.now() - pauseStart);
+    setStatus("Running…");
+    pauseBtn.disabled=false;
+    resumeBtn.disabled=true;
+  }
+
+  cv.addEventListener("click",(ev)=>{
+    if(!running || paused) return;
+    const tr = session.trials[trialIndex];
+    const cond = PLAN[trialIndex];
+
+    const rect=cv.getBoundingClientRect();
+    const mx=(ev.clientX-rect.left)*(cv.width/rect.width);
+    const my=(ev.clientY-rect.top)*(cv.height/rect.height);
+
+    const it=hitTest(mx,my);
+    if(!it || it.clicked) return;
+    it.clicked=true;
+
+    const now=performance.now();
+    const t_rel_ms = now - startPerf - pausedAccum;
+
+    tr.events.push({
+      is_target: it.isTarget,
+      t_rel_ms
+    });
+
+    render(cond);
+  });
+
+  function computeParticipantSummary(){
+    // Make condition lookup
+    const by = {};
+    for (const tr of session.trials) by[tr.cond] = tr.summary;
+
+    const white = by["WHITE"] || {};
+    const blue = by["TINT"] || {};
+    const medium = by["MID"] || {};
+
+    const order = session.plan.map(condLabel).join(" → ");
+
+    let delta = "";
+    if (blue.mean_rt_ms !== "" && white.mean_rt_ms !== "" &&
+        blue.mean_rt_ms != null && white.mean_rt_ms != null) {
+      delta = Number(blue.mean_rt_ms) - Number(white.mean_rt_ms);
+    }
+
+    // Match your Google Form 21-field layout
+    return {
+      participantId: SETTINGS.pid,
+      sessionId: session.session_id,
+      protocol: protocolLabel(),
+      order,
+      durationSec: SETTINGS.duration_s,
+
+      white_hits: white.hits ?? "",
+      white_omissions: white.omissions ?? "",
+      white_falseAlarms: white.false_alarms ?? "",
+      white_meanRTms: white.mean_rt_ms ?? "",
+      white_totalTimeSec: white.total_time_s ?? "",
+
+      blue_hits: blue.hits ?? "",
+      blue_omissions: blue.omissions ?? "",
+      blue_falseAlarms: blue.false_alarms ?? "",
+      blue_meanRTms: blue.mean_rt_ms ?? "",
+      blue_totalTimeSec: blue.total_time_s ?? "",
+
+      medium_hits: medium.hits ?? "",
+      medium_omissions: medium.omissions ?? "",
+      medium_falseAlarms: medium.false_alarms ?? "",
+      medium_meanRTms: medium.mean_rt_ms ?? "",
+      medium_totalTimeSec: medium.total_time_s ?? "",
+
+      deltaBlueMinusWhiteMeanRTms: delta
+    };
+  }
+
+  function renderResults(s){
+    // Build a small per-condition table for readability
+    const rows = [];
+
+    function addRow(name, hits, omissions, fa, rt, time){
+      if (hits === "" && omissions === "" && fa === "" && rt === "" && time === "") return;
+      rows.push(`
+        <tr>
+          <th>${name}</th>
+          <td>${hits}</td>
+          <td>${omissions}</td>
+          <td>${fa}</td>
+          <td>${rt}</td>
+          <td>${time}</td>
+        </tr>
+      `);
+    }
+
+    addRow("White", s.white_hits, s.white_omissions, s.white_falseAlarms, s.white_meanRTms, s.white_totalTimeSec);
+    addRow("Mid", s.medium_hits, s.medium_omissions, s.medium_falseAlarms, s.medium_meanRTms, s.medium_totalTimeSec);
+    addRow("Blue", s.blue_hits, s.blue_omissions, s.blue_falseAlarms, s.blue_meanRTms, s.blue_totalTimeSec);
+
+    resultsEl.innerHTML = `
+      <div class="banner muted" style="margin-bottom:10px;">
+        <b>Session</b><br>
+        Participant ID: <b>${safeCSV(s.participantId)}</b><br>
+        Session ID: <b>${safeCSV(s.sessionId)}</b><br>
+        Order: <b>${safeCSV(s.order)}</b><br>
+        Duration: <b>${safeCSV(s.durationSec)}s</b>
+      </div>
+
+      <div class="big">Core Metrics</div>
+      <table>
+        <thead>
+          <tr>
+            <th>Condition</th>
+            <td><b>Hits</b></td>
+            <td><b>Omissions</b></td>
+            <td><b>False alarms</b></td>
+            <td><b>Mean RT (ms)</b></td>
+            <td><b>Time (s)</b></td>
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.join("")}
+        </tbody>
+      </table>
+
+      <div class="hint" style="margin-top:10px;">
+        Blue − White mean RT (ms): <b>${(s.deltaBlueMinusWhiteMeanRTms === "" ? "—" : safeCSV(s.deltaBlueMinusWhiteMeanRTms))}</b><br>
+        Items: ${SETTINGS.n_items} • Targets: ${Math.round(SETTINGS.target_rate*100)}% • Layout: ${SETTINGS.layout}
+      </div>
+    `;
+  }
+
+  csvBtn.addEventListener("click",()=>{
+    const s = computeParticipantSummary();
+    const header = [
+      "participantId","sessionId","protocol","order","durationSec",
+      "white_hits","white_omissions","white_falseAlarms","white_meanRTms","white_totalTimeSec",
+      "blue_hits","blue_omissions","blue_falseAlarms","blue_meanRTms","blue_totalTimeSec",
+      "medium_hits","medium_omissions","medium_falseAlarms","medium_meanRTms","medium_totalTimeSec",
+      "deltaBlueMinusWhiteMeanRTms"
+    ];
+    const row = header.map(k => safeCSV(s[k] ?? "")).join(",");
+    const csv = header.join(",") + "\n" + row + "\n";
+    const blob=new Blob([csv],{type:"text/csv"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`cancellation_${s.participantId}_${s.sessionId}.csv`;
+    a.click();
+  });
+
+  copyBtn.addEventListener("click", async ()=>{
+    const s = computeParticipantSummary();
+    const lines=[];
+    lines.push(`Cancellation Task — ${s.protocol}`);
+    lines.push(`Participant: ${s.participantId}`);
+    lines.push(`Session: ${s.sessionId}`);
+    lines.push(`Order: ${s.order}`);
+    lines.push(`Duration: ${s.durationSec}s`);
+    lines.push(`White: hits=${s.white_hits}, omissions=${s.white_omissions}, FA=${s.white_falseAlarms}, meanRT=${s.white_meanRTms}`);
+    lines.push(`Mid: hits=${s.medium_hits}, omissions=${s.medium_omissions}, FA=${s.medium_falseAlarms}, meanRT=${s.medium_meanRTms}`);
+    lines.push(`Blue: hits=${s.blue_hits}, omissions=${s.blue_omissions}, FA=${s.blue_falseAlarms}, meanRT=${s.blue_meanRTms}`);
+    lines.push(`Blue-White meanRT: ${s.deltaBlueMinusWhiteMeanRTms}`);
+    try{
+      await navigator.clipboard.writeText(lines.join("\n"));
+      setStatus("Copied ✅");
+      setTimeout(()=>setStatus("Done ✅"), 700);
+    }catch{
+      alert(lines.join("\n"));
+    }
+  });
+
+  function startProtocol(){ beginProtocol(); }
+  function startNextTrial(){
+    const idx = trialIndex + 1;
+    if(idx >= PLAN.length) return;
+    beginTrial(idx);
+  }
+
+  settingsBtn.addEventListener("click", openSettings);
+  closeSettingsBtn.addEventListener("click", closeSettings);
+  modalBack.addEventListener("click", (e)=>{ if(e.target===modalBack) closeSettings(); });
+  saveSettingsBtn.addEventListener("click", ()=>{
+    if(settingsLocked){
+      alert("Settings are locked after the protocol begins. Restart to change settings.");
+      return;
+    }
+    applyModalToSettings();
+    closeSettings();
+  });
+
+  startProtocolBtn.addEventListener("click", startProtocol);
+  introStartBtn.addEventListener("click", startProtocol);
+  startNextBtn.addEventListener("click", startNextTrial);
+  betweenStartBtn.addEventListener("click", startNextTrial);
+
+  pauseBtn.addEventListener("click", pause);
+  resumeBtn.addEventListener("click", resume);
+  restartBtn.addEventListener("click", resetAll);
+
+  document.addEventListener("keydown",(e)=>{
+    if(e.ctrlKey && e.shiftKey && (e.key==="S" || e.key==="s")){
+      e.preventDefault();
+      openSettings();
+    }
+  });
+
+  function fitCanvasToScreen(){
+    const header = document.querySelector("header");
+    const banner = document.querySelector(".banner");
+    const main = document.getElementById("mainLayout");
+
+    const paddingRoom = 60;
+    const availableH = window.innerHeight
+      - (header ? header.offsetHeight : 0)
+      - (banner ? banner.offsetHeight : 0)
+      - paddingRoom;
+
+    const taskCard = main ? main.querySelector(".card") : null;
+    const availableW = taskCard ? taskCard.clientWidth - 40 : window.innerWidth - 40;
+
+    const size = Math.max(420, Math.min(860, availableH, availableW));
+    cv.style.width = size + "px";
+    cv.style.height = size + "px";
+  }
+// ===============================
+// GOOGLE FORM (1 ROW PER PARTICIPANT) AUTO-SUBMIT
+// ===============================
+const GOOGLE_FORM_ACTION_URL =
+  "https://docs.google.com/forms/d/e/1FAIpQLScIPKzSMwVwZXN3xLer2WEYpDXh_NNVz9rR5-d0OcffdMJd8A/formResponse";
+
+// Map your form fields (entry IDs)
+const FORM_ENTRY = {
+  participant_id: "entry.644200680",
+  session_id: "entry.117953226",
+  protocol: "entry.491528102",
+  order: "entry.271299425",
+  duration_sec: "entry.836378996",
+
+  white_hits: "entry.517770744",
+  white_omissions: "entry.1483177179",
+  white_commissions: "entry.97989345",
+  white_meanRT_ms: "entry.1816529791",
+  white_totalTime_s: "entry.1614849134",
+
+  blue_hits: "entry.234078243",
+  blue_omissions: "entry.665470837",
+  blue_commissions: "entry.89001755",
+  blue_meanRT_ms: "entry.1038228631",
+  blue_totalTime_s: "entry.1962117722",
+
+  medium_hits: "entry.1167516561",
+  medium_omissions: "entry.275099489",
+  medium_commissions: "entry.1664261428",
+  medium_meanRT_ms: "entry.2038088285",
+  medium_totalTime_s: "entry.141740432",
+
+  delta_meanRT_blue_minus_white: "entry.1051441543",
+};
+
+// Helper: safe value for Google Forms (blank if undefined/null)
+function v(x) {
+  if (x === undefined || x === null) return "";
+  return String(x);
+}
+
+// Call this ONCE at the end, after all trials are completed.
+// summary should be a single object with keys matching below.
+function submitParticipantRowToGoogleForm(summary) {
+  const params = new URLSearchParams();
+
+  // core identifiers
+  params.append(FORM_ENTRY.participant_id, v(summary.participant_id));
+  params.append(FORM_ENTRY.session_id, v(summary.session_id));
+  params.append(FORM_ENTRY.protocol, v(summary.protocol));
+  params.append(FORM_ENTRY.order, v(summary.order));
+  params.append(FORM_ENTRY.duration_sec, v(summary.duration_sec));
+
+  // WHITE
+  params.append(FORM_ENTRY.white_hits, v(summary.white_hits));
+  params.append(FORM_ENTRY.white_omissions, v(summary.white_omissions));
+  params.append(FORM_ENTRY.white_commissions, v(summary.white_commissions));
+  params.append(FORM_ENTRY.white_meanRT_ms, v(summary.white_meanRT_ms));
+  params.append(FORM_ENTRY.white_totalTime_s, v(summary.white_totalTime_s));
+
+  // BLUE
+  params.append(FORM_ENTRY.blue_hits, v(summary.blue_hits));
+  params.append(FORM_ENTRY.blue_omissions, v(summary.blue_omissions));
+  params.append(FORM_ENTRY.blue_commissions, v(summary.blue_commissions));
+  params.append(FORM_ENTRY.blue_meanRT_ms, v(summary.blue_meanRT_ms));
+  params.append(FORM_ENTRY.blue_totalTime_s, v(summary.blue_totalTime_s));
+
+  // MEDIUM (optional — leave blank if not used)
+  params.append(FORM_ENTRY.medium_hits, v(summary.medium_hits));
+  params.append(FORM_ENTRY.medium_omissions, v(summary.medium_omissions));
+  params.append(FORM_ENTRY.medium_commissions, v(summary.medium_commissions));
+  params.append(FORM_ENTRY.medium_meanRT_ms, v(summary.medium_meanRT_ms));
+  params.append(FORM_ENTRY.medium_totalTime_s, v(summary.medium_totalTime_s));
+
+  // DELTA
+  params.append(
+    FORM_ENTRY.delta_meanRT_blue_minus_white,
+    v(summary.delta_meanRT_blue_minus_white)
+  );
+
+  // Most reliable background submit in browsers:
+  // 1) try sendBeacon
+  const blob = new Blob([params.toString()], {
+    type: "application/x-www-form-urlencoded",
+  });
+
+  const beaconOK = navigator.sendBeacon(GOOGLE_FORM_ACTION_URL, blob);
+
+  // 2) fallback fetch (no-cors)
+  if (!beaconOK) {
+    fetch(GOOGLE_FORM_ACTION_URL, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: params.toString(),
+    }).catch(() => {});
+  }
+
+  return beaconOK; // true/false (beacon only)
+}
+
+
+  function init(){
+    setStatus("Ready");
+    setTrialLabel("Trial: —");
+    setTimer(0);
+    drawBlank();
+    updateIntroText();
+    autosaveStatus.textContent = "On (fixed form)";
+    fitCanvasToScreen();
+    window.addEventListener("resize", fitCanvasToScreen);
+  }
+  init();
+})();
+</script>
+</body>
+</html>
+
